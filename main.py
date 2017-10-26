@@ -4,21 +4,59 @@ import pandas as pd
 import re
 
 
+
+
+
 def main():
 
-    filemame = 'C://Users//Juan//Desktop//AI network data//data1.csv'
-    json = 'C://Users//Juan//Desktop//AI network data//bn1.json'
+    filemame = 'C://Users//Juan//Desktop//AI network data//data2.csv'
+    json = 'C://Users//Juan//Desktop//AI network data//bn2.json'
     dataframe = GetParameters.read_csv(filemame)
     json = GetParameters.read_json(json)
     parameters = get_parameters(dataframe)
     network = build_network(parameters, json)
-
     parameters_dict = calculate_probabilities(network, dataframe)
-    e = ["Good Engine", "Working Air Conditioner"]
+    order = fix_network(network)
+    e = ["Bad Battery"]
+    enumerate_ask("!No Start", e, network, parameters_dict, order)
 
-    enumerate_ask("High Car Value", e, network, parameters_dict)
+
+def fix_network(network):
+    order = {}
+    for item in network:
+        string = order_network(network, item)
+        order[item] = string
+    network_order = []
+    for x in range(0, len(order)):
+        min_val = min(order, key=lambda k: len(order[k]))
+        network_order.append(min_val)
+        del order[min_val]
+
+    return network_order
 
 
+def order_network(network, item):
+
+            try:
+                string = ""
+                item = str(item)
+                item = re.sub('[\'\[\]]', '', item)
+                A = str(network[item])
+                A = re.sub('[\']', '', A)
+                A = A.split(",")
+                for x in range(0, len(A)):
+                    A[x] = re.sub('[\'\[\]]', '', A[x])
+                    B = order_network(network, A[x])
+                    if B is not None:
+                        string += A[x] + "," + B
+                    else:
+                        string += A[x]
+                return string
+            except:
+                A = None
+                B = None
+                string = None
+                return string
 
 
 def build_network(parameters, json):
@@ -99,36 +137,42 @@ def get_parameters(dataframe):
     return parameters
 
 
-def enumerate_ask(x, e, bn, know_prob):
+def enumerate_ask(x, e, bn, know_prob, order):
 
     lookingfor = x
-
-
     result = []
 
     negative_bn = bn.copy()
+    negative_order = order.copy()
     if "!" not in lookingfor:
         q = []
         q.append(lookingfor)
         q.append("!" + lookingfor)
         negative_bn["!" + lookingfor] = negative_bn[lookingfor]
         del negative_bn[lookingfor]
+        for x in range(0, len(negative_order)):
+            if negative_order[x] == lookingfor:
+                negative_order[x] = "!" + lookingfor
     else:
         q = []
         q.append(lookingfor.replace("!", ""))
         q.append(lookingfor)
         negative_bn[lookingfor] = negative_bn[lookingfor.replace("!", "")]
         del negative_bn[lookingfor.replace("!", "")]
-
+        for x in range(0, len(negative_order)):
+            if negative_order[x] == lookingfor.replace("!", ""):
+                negative_order[x] = lookingfor
 
     for value in q:
         if "!" in value:
             params = negative_bn.copy()
+            order = negative_order.copy()
         else:
             params = bn.copy()
+            order = order.copy()
         a = e.copy()
         a.append(value)
-        number = enumerate_all(params, a, know_prob)
+        number = enumerate_all(params, a, know_prob, order)
         result.append(number)
 
     x = result[0] + result[1]
@@ -137,10 +181,44 @@ def enumerate_ask(x, e, bn, know_prob):
     print("pos" + ":" + str(positive) + "\n" + "neg" + ":" + str(negative))
 
 
-def enumerate_all(params, e, know_prob):
+def get_combinations(next_key, Y, e, know_prob):
+    probo = 1
+    fathers_list =[]
+    if "!" not in next_key:
+        if len(Y) > 0:
+            for fathers in Y:
+                if fathers in e:
+                    fathers_list.append(fathers)
+                    fathers_list.append(fathers)
+                elif "!" + fathers in e:
+                    fathers_list.append("!" + fathers)
+                    fathers_list.append("!" + fathers)
+                else:
+                    fathers_list.append(fathers)
+                    fathers_list.append("!" + fathers)
+            combinations_done = {}
+            for x in range(0, len(Y)):
+                select = len(Y) % len(fathers_list)
+                string_fathers = ""
+                for y in range(0, select):
+                    string_fathers += fathers_list[y * 2] + ", "
+                string_fathers = string_fathers.strip(", ")
+
+                if string_fathers in combinations_done:
+                    pass
+                else:
+                    probo *= know_prob[next_key + "|" + string_fathers]
+                    combinations_done[string_fathers] = probo
+        else:
+            probo = know_prob[next_key]
+    return probo
+
+
+def enumerate_all(params, e, know_prob, order):
     if not params:
         return 1
-    next_key = next(iter(params))
+    next_key = next(iter(order))
+    order.remove(next_key)
     Y = params[next_key]
     del params[next_key]
     next_key = re.sub('[\']', '', next_key)
@@ -149,147 +227,47 @@ def enumerate_all(params, e, know_prob):
         next_key = "!" + next_key
 
     if next_key in e:
-        probo = 1
-        fathers_list =[]
         if "!" not in next_key:
-            if len(Y) > 0:
-                for fathers in Y:
-                    if fathers in e:
-                        fathers_list.append(fathers)
-                        fathers_list.append(fathers)
-                    elif "!" + fathers in e:
-                        fathers_list.append("!" + fathers)
-                        fathers_list.append("!" + fathers)
-                    else:
-                        fathers_list.append(fathers)
-                        fathers_list.append("!" + fathers)
-                combinatios_done = {}
-                for x in range(0, len(Y)):
-                    select = len(Y) % len(fathers_list)
-                    string_fathers = ""
-                    for y in range(0, select):
-                        string_fathers += fathers_list[y * 2] + ", "
-                    string_fathers = string_fathers.strip(", ")
-
-                    if string_fathers in combinatios_done:
-                        pass
-                    else:
-                        probo *= know_prob[next_key + "|" + string_fathers]
-                        combinatios_done[string_fathers] = probo
-            else:
-                probo = know_prob[next_key]
-            j = probo * enumerate_all(params, e, know_prob)
+            probo = get_combinations(next_key, Y, e, know_prob)
+            j = probo * enumerate_all(params, e, know_prob, order)
             return j
         else:
             temp = next_key.replace("!", "")
-            if len(Y) > 0:
-                for fathers in Y:
-                    if fathers in e:
-                        fathers_list.append(fathers)
-                        fathers_list.append(fathers)
-                    elif "!" + fathers in e:
-                        fathers_list.append("!" + fathers)
-                        fathers_list.append("!" + fathers)
-                    else:
-                        fathers_list.append(fathers)
-                        fathers_list.append("!" + fathers)
-                combinatios_done = {}
-                for x in range(0, len(Y)):
-                    select = len(Y) % len(fathers_list)
-                    string_fathers = ""
-                    for y in range(0, select):
-                        string_fathers += fathers_list[y * 2] + ", "
-                    string_fathers = string_fathers.strip(", ")
-                    if string_fathers in combinatios_done:
-                        pass
-                    else:
-                        probo *= (1 - know_prob[temp + "|" + string_fathers])
-                        combinatios_done[string_fathers] = probo
-            else:
-                probo = 1 - know_prob[temp]
-            j = probo * enumerate_all(params, e, know_prob)
+            probo = (1 - get_combinations(temp, Y, e, know_prob))
+            j = probo * enumerate_all(params, e, know_prob, order)
             return j
-
     else:
-        probo = 1
-        fathers_list =[]
         if "!" not in next_key:
-            if len(Y) > 0:
-                for fathers in Y:
-                    if fathers in e:
-                        fathers_list.append(fathers)
-                        fathers_list.append(fathers)
-                    elif "!" + fathers in e:
-                        fathers_list.append("!" + fathers)
-                        fathers_list.append("!" + fathers)
-                    else:
-                        fathers_list.append(fathers)
-                        fathers_list.append("!" + fathers)
-                combinatios_done = {}
-                for x in range(0, len(Y)):
-                    select = len(Y) % len(fathers_list)
-                    string_fathers = ""
-                    for y in range(0, select):
-                        string_fathers += fathers_list[y * 2] + ", "
-                    string_fathers = string_fathers.strip(", ")
-                    if string_fathers in combinatios_done:
-                        pass
-                    else:
-                        probo *= know_prob[next_key + "|" + string_fathers]
-                        combinatios_done[string_fathers] = probo
-            else:
-                probo = know_prob[next_key]
+            probo = get_combinations(next_key, Y, e, know_prob)
             a = e.copy()
             b = e.copy()
+            aorder = order.copy()
+            border = order.copy()
             a.append(next_key)
             b.append("!" + next_key)
             aparams = params.copy()
             bparams = params.copy()
-            enum = enumerate_all(aparams, a, know_prob)
+            enum = enumerate_all(aparams, a, know_prob, aorder)
             A = (probo * enum)
-            enum = enumerate_all(bparams, b, know_prob)
+            enum = enumerate_all(bparams, b, know_prob, border)
             B = (1 - probo) * enum
             return A + B
         else:
             temp = next_key.replace("!", "")
-            if len(Y) > 0:
-                for fathers in Y:
-                    if fathers in e:
-                        fathers_list.append(fathers)
-                        fathers_list.append(fathers)
-                    elif "!" + fathers in e:
-                        fathers_list.append("!" + fathers)
-                        fathers_list.append("!" + fathers)
-                    else:
-                        fathers_list.append(fathers)
-                        fathers_list.append("!" + fathers)
-                combinatios_done = {}
-                for x in range(0, len(Y)):
-                    select = len(Y) % len(fathers_list)
-                    string_fathers = ""
-                    for y in range(0, select):
-                        string_fathers += fathers_list[y * 2] + ", "
-                    string_fathers = string_fathers.strip(", ")
-                    if string_fathers in combinatios_done:
-                        pass
-                    else:
-                        probo *= (1 - know_prob[temp + "|" + string_fathers])
-                        combinatios_done[string_fathers] = probo
-            else:
-                probo = 1 - know_prob[temp]
+            probo = get_combinations(temp, Y, e, know_prob)
             a = e.copy()
             b = e.copy()
+            aorder = order.copy()
+            border = order.copy()
             a.append("!" + temp)
             b.append(temp)
             aparams = params.copy()
             bparams = params.copy()
-            enum = enumerate_all(aparams, a, know_prob)
+            enum = enumerate_all(aparams, a, know_prob, aorder)
             A = (probo * enum)
-            enum = enumerate_all(bparams, b, know_prob)
+            enum = enumerate_all(bparams, b, know_prob, border)
             B = (1 - probo) * enum
             return A + B
-
-
 
 
 if __name__ == '__main__':
