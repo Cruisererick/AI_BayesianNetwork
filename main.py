@@ -1,64 +1,93 @@
 import GetParameters
+import numpy as np
 import pandas as pd
-
 
 
 def main():
 
     filemame = 'C://Users//Juan//Desktop//AI network data//data1.csv'
+    json = 'C://Users//Juan//Desktop//AI network data//bn1.json'
     dataframe = GetParameters.read_csv(filemame)
-
+    json = GetParameters.read_json(json)
     parameters = get_parameters(dataframe)
-    calculate_pro(parameters, dataframe)
+    network = build_network(parameters, json)
+    parameters_dict = calculate_probabilities(network, dataframe)
+
+    for ele in parameters_dict:
+        print(ele)
+        print(parameters_dict[ele])
 
 
-def calculate_pro(parameters, dataframe):
-    parameters_Dict = {}
+def build_network(parameters, json):
+    network_dict = {}
 
-    x = dataframe.groupby(parameters[0])[parameters[0]].count()
-    high_milage_true = x[0]/(x[0] + x[1])
-    print(high_milage_true)
+    for parameter in parameters:
+        try:
+            sons = json[parameter]
+            father = parameter
+            for son in sons:
+                if son in network_dict:
+                    network_dict[son].append(father)
+                else:
+                    list = []
+                    list.append(father)
+                    network_dict[son] = list
+            if father not in network_dict:
+                list = []
+                network_dict[father] = list
+        except KeyError:
+            pass
 
-
-    x = dataframe.groupby(parameters[2])[parameters[2]].count()
-    air_working_true = x[0]/(x[0] + x[1])
-    print(air_working_true)
-
-
-    x = dataframe.groupby([parameters[1], parameters[0]])[parameters[1]].count()
-    true_false = x.loc[[(1, 0)]]
-    false_false = x.loc[[(0, 0)]]
-    false_true = x.loc[[(0, 1)]]
-    true_true = x.loc[[(1, 1)]]
-
-    engine_working_mt = true_false[1][0] / (true_false[1][0] + false_false[0][0])
-    engine_working_mf = true_true[1][1] / (true_true[1][1] + false_true[0][1])
-    print(engine_working_mt)
-    print(engine_working_mf)
-
-    x = dataframe.groupby([parameters[3], parameters[1], parameters[2]])[parameters[3]].count()
-    true_true_true = x.loc[[(1, 1, 1)]]
-    false_true_true = x.loc[[(0, 1, 1)]]
-
-    true_true_false = x.loc[[(1, 1, 0)]]
-    false_true_false = x.loc[[(0, 1, 0)]]
-
-    true_false_true = x.loc[[(1, 0, 1)]]
-    false_false_true = x.loc[[(0, 0, 1)]]
-
-    highvalue_et_at = true_true_true[1][1][1] / (true_true_true[1][1][1] + false_true_true[0][1][1])
-    highvalue_et_af = true_true_false[1][1][0] / (false_true_false[0][1][0] + true_true_false[1][1][0])
-    highvalue_ef_at = true_false_true[1][0][1] / (true_false_true[1][0][1] + false_false_true[0][0][1])
-    highvalue_ef_af = 0
-
-    print(highvalue_et_at)
-    print(highvalue_et_af)
-    print(highvalue_ef_at)
-    print(highvalue_ef_af)
+    return network_dict
 
 
+def calculate_probabilities(network, dataframe):
+    parameters_dict = {}
 
+    for param in network:
+        if len(network[param]) == 0:
+            lookup = dataframe.groupby([param])[param].count()
+            true = lookup[1]
+            false = lookup[0]
+            parameters_dict[param] = true / (true + false)
+        else:
+            lookup = dataframe.groupby([param, *network[param]])[param].count()
+            iters = len(network[param]) * 2
+            parentstate = [1] * len(network[param])
+            for x in range(0, iters):
+                true = lookup[1].copy()
+                false = lookup[0].copy()
+                if len(network[param]) > 1:
+                    change = x % len(network[param])
+                else:
+                    change = 0
 
+                iterfather = network[param][change]
+                parentstate[change] = int(not parentstate[change])
+                if "!" in iterfather:
+                    iterfather = iterfather.replace("!", "")
+                else:
+                    iterfather = "!" + iterfather
+
+                for y in range(0, len(network[param])):
+                    try:
+                        true = true[parentstate[y]]
+                    except KeyError:
+                        true = 0
+                for y in range(0, len(network[param])):
+                    try:
+                        false = false[parentstate[y]]
+                    except KeyError:
+                        false = 0
+
+                temp = network[param]
+                temp[change] = iterfather
+                parentsstring = str(temp).replace("[", "")
+                parentsstring = parentsstring.replace("]", "")
+
+                parameters_dict[param + "|" + parentsstring] = true / (true + false)
+
+    return parameters_dict
 
 
 def get_parameters(dataframe):
