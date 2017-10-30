@@ -18,8 +18,8 @@ def main():
 
     e = ["A", "B", "C", "D", "E"] # Parameters given
     # number = enumerate_ask(None, e, network, parameters_dict, order) # enumerate_ask (parameter, parameters given, network, probabilities of parameters, order of the network)
-    # model_probability = model_fit(network, order, parameters_dict, dataframe) # Fit the model with the data
-    # print(model_probability)
+    model_probability = model_fit(network, order, parameters_dict, dataframe) # Fit the model with the data
+    print(model_probability)
 
 
 def fix_network(network):
@@ -183,7 +183,8 @@ def enumerate_ask(x, e, bn, know_prob, order):
         return [positive, negative]
     else:
         params = bn.copy()
-        number = enumerate_all(params, e, know_prob, order)
+        order_copy = order.copy()
+        number = enumerate_all(params, e, know_prob, order_copy)
         return number
 
 
@@ -286,34 +287,35 @@ def model_fit(network, order, parameters_dict, dataframe):
     number = 0
     for x in range(0, len(A)):
         e = []
-        if A[x] == "True":
+        if str(A[x]) == "True":
             e.append("A")
         else:
             e.append("!A")
 
-        if B[x] == "True":
+        if str(B[x]) == "True":
             e.append("B")
         else:
             e.append("!B")
 
-        if C[x] == "True":
+        if str(C[x]) == "True":
             e.append("C")
         else:
             e.append("!C")
 
-        if D[x] == "True":
+        if str(D[x]) == "True":
             e.append("D")
         else:
             e.append("!D")
 
-        if E[x] == "True":
+        if str(E[x]) == "True":
             e.append("E")
         else:
             e.append("!E")
 
         number += math.log(enumerate_ask(None, e, network, parameters_dict, order))
 
-        return number
+
+    return number
 
 
 
